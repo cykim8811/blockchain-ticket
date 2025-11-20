@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { events } from "@/lib/data";
-import { Loader2, Armchair } from "lucide-react";
+import { Loader2, Armchair, BellRing } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 // Mock seat data generator - Now starts all available
@@ -41,6 +41,7 @@ export default function TicketingView() {
     const [seats, setSeats] = useState(generateSeats());
     const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
     const [bookedCount, setBookedCount] = useState(0);
+    const [hasWaiters, setHasWaiters] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -48,7 +49,11 @@ export default function TicketingView() {
 
     const event = events.find(e => e.id === Number(id));
     const totalSeats = event?.totalSeats || 40;
-    const isFull = bookedCount >= totalSeats;
+
+    // Check if user is eligible to book despite being full (i.e., it's their turn)
+    const [isEligible, setIsEligible] = useState(false);
+    // isFull now means "Waitlist Mode": either physically full OR there's a queue I'm not at the front of
+    const isFull = (bookedCount >= totalSeats || hasWaiters) && !isEligible;
 
     useEffect(() => {
         setIsLoaded(true);
@@ -62,20 +67,64 @@ export default function TicketingView() {
             where("status", "in", ["booked", "waiting"])
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setBookedCount(snapshot.size);
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+            // Calculate booked count (only 'booked' status counts towards capacity)
+            const bookedDocs = snapshot.docs.filter(doc => doc.data().status === 'booked');
+            const currentBookedCount = bookedDocs.length;
+            setBookedCount(currentBookedCount);
+
+            // Get waiting docs
+            const waitingDocs = snapshot.docs
+                .filter(doc => doc.data().status === 'waiting')
+                .sort((a, b) => a.data().createdAt.seconds - b.data().createdAt.seconds);
+
+            setHasWaiters(waitingDocs.length > 0);
 
             // Update seat map based on real bookings
-            const bookedSeats = new Set(snapshot.docs.map(doc => doc.data().seatNumber));
+            const bookedSeatNumbers = new Set(bookedDocs.map(doc => doc.data().seatNumber));
 
             setSeats(prevSeats => prevSeats.map(seat => ({
                 ...seat,
-                status: bookedSeats.has(seat.id) ? 'booked' : 'available'
+                status: bookedSeatNumbers.has(seat.id) ? 'booked' : 'available'
             })));
+
+            // Check eligibility if user is logged in
+            if (user) {
+                const availableSeats = totalSeats - currentBookedCount;
+
+                if (availableSeats > 0) {
+                    // Find user's waiting ticket
+                    const myWaitingTicket = snapshot.docs.find(
+                        doc => doc.data().userId === user.uid && doc.data().status === 'waiting'
+                    );
+
+                    if (myWaitingTicket) {
+                        // Calculate rank
+                        const myIndex = waitingDocs.findIndex(doc => doc.id === myWaitingTicket.id);
+
+                        if (myIndex !== -1 && myIndex < availableSeats) {
+                            setIsEligible(true);
+                        } else {
+                            setIsEligible(false);
+                        }
+                    } else {
+                        // If user has no waiting ticket
+                        // If there are waiters, new users must join the back of the line (not eligible)
+                        if (waitingDocs.length > 0) {
+                            setIsEligible(false);
+                        } else {
+                            // No waiters, open seats -> Eligible
+                            setIsEligible(true);
+                        }
+                    }
+                } else {
+                    setIsEligible(false);
+                }
+            }
         });
 
         return () => unsubscribe();
-    }, [id]);
+    }, [id, user, totalSeats]);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -227,10 +276,18 @@ export default function TicketingView() {
                             </div>
                             <div className="flex justify-between text-sm text-muted-foreground">
                                 <span>Capacity</span>
-                                <span className={`font - medium ${isFull ? 'text-destructive' : 'text-green-600'} `}>
+                                <span className={`font-medium ${isFull ? 'text-destructive' : 'text-green-600'}`}>
                                     {bookedCount} / {totalSeats} Filled
                                 </span>
                             </div>
+
+                            {isEligible && bookedCount >= totalSeats && (
+                                <div className="mt-4 p-3 bg-green-100 border border-green-200 text-green-800 rounded-md text-sm font-medium flex items-center animate-pulse">
+                                    <BellRing className="w-4 h-4 mr-2" />
+                                    It's your turn! You can now select a seat.
+                                </div>
+                            )}
+
                             {selectedSeat && step > 2 && !isFull && (
                                 <div className="flex justify-between text-sm text-primary font-medium">
                                     <span>Selected Seat</span>
