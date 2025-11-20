@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { events } from "@/lib/data";
 import { Loader2, Armchair } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Mock seat data generator
+// Mock seat data generator - Now starts all available
 const generateSeats = () => {
     const rows = ['A', 'B', 'C', 'D', 'E'];
     const cols = 8;
@@ -22,7 +22,7 @@ const generateSeats = () => {
                 id: `${row}${i} `,
                 row,
                 number: i,
-                status: Math.random() > 0.8 ? 'booked' : 'available' // Randomly book 20% of seats
+                status: 'available'
             });
         }
     }
@@ -38,7 +38,7 @@ export default function TicketingView() {
     const [loading, setLoading] = useState(false);
     const [processingStatus, setProcessingStatus] = useState<'idle' | 'sending' | 'confirming' | 'booking'>('idle');
     const [isLoaded, setIsLoaded] = useState(false);
-    const [seats] = useState(generateSeats());
+    const [seats, setSeats] = useState(generateSeats());
     const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
     const [bookedCount, setBookedCount] = useState(0);
     const [formData, setFormData] = useState({
@@ -53,18 +53,28 @@ export default function TicketingView() {
     useEffect(() => {
         setIsLoaded(true);
 
-        // Fetch current booking count
-        const fetchBookedCount = async () => {
-            if (!id) return;
-            const q = query(
-                collection(db, "tickets"),
-                where("eventId", "==", id),
-                where("status", "in", ["booked", "waiting"])
-            );
-            const snapshot = await getDocs(q);
+        if (!id) return;
+
+        // Real-time listener for bookings
+        const q = query(
+            collection(db, "tickets"),
+            where("eventId", "==", id),
+            where("status", "in", ["booked", "waiting"])
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             setBookedCount(snapshot.size);
-        };
-        fetchBookedCount();
+
+            // Update seat map based on real bookings
+            const bookedSeats = new Set(snapshot.docs.map(doc => doc.data().seatNumber));
+
+            setSeats(prevSeats => prevSeats.map(seat => ({
+                ...seat,
+                status: bookedSeats.has(seat.id) ? 'booked' : 'available'
+            })));
+        });
+
+        return () => unsubscribe();
     }, [id]);
 
     useEffect(() => {
@@ -298,8 +308,7 @@ export default function TicketingView() {
                                         key={seat.id}
                                         disabled={seat.status === 'booked'}
                                         onClick={() => setSelectedSeat(seat.id)}
-                                        className={`
-p - 2 rounded - md flex items - center justify - center transition - colors
+                                        className={`p-2 rounded-md flex items-center justify-center transition-colors
                                             ${seat.status === 'booked'
                                                 ? 'bg-neutral-300 text-muted-foreground cursor-not-allowed'
                                                 : selectedSeat === seat.id
