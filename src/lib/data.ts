@@ -6,7 +6,7 @@ export const events = [
         location: "Seoul, Korea",
         price: "$150",
         image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80",
-        totalSeats: 40
+        totalSeats: 2
     },
     {
         id: 2,
