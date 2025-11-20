@@ -23,6 +23,7 @@ export default function MyTicketsView() {
     const navigate = useNavigate();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
+    const [waitlistPositions, setWaitlistPositions] = useState<Record<string, number>>({});
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -48,6 +49,34 @@ export default function MyTicketsView() {
                 ticketsData.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
 
                 setTickets(ticketsData);
+
+                // Calculate waitlist positions for waiting tickets
+                const positions: Record<string, number> = {};
+
+                await Promise.all(ticketsData.map(async (ticket) => {
+                    if (ticket.status === 'waiting') {
+                        // Query all waiting tickets for this event
+                        const qWaiting = query(
+                            collection(db, "tickets"),
+                            where("eventId", "==", ticket.eventId),
+                            where("status", "==", "waiting")
+                        );
+                        const snap = await getDocs(qWaiting);
+
+                        // Filter and sort to find rank
+                        // Note: We do this client side for simplicity as Firestore < query on different fields requires composite index
+                        const waitingDocs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Ticket));
+                        waitingDocs.sort((a, b) => a.createdAt.seconds - b.createdAt.seconds);
+
+                        const rank = waitingDocs.findIndex(t => t.id === ticket.id);
+                        if (rank !== -1) {
+                            positions[ticket.id] = rank + 1;
+                        }
+                    }
+                }));
+
+                setWaitlistPositions(positions);
+
             } catch (error) {
                 console.error("Error fetching tickets:", error);
             } finally {
@@ -107,6 +136,12 @@ export default function MyTicketsView() {
                                             {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
                                         </span>
                                     </div>
+                                    {ticket.status === 'waiting' && waitlistPositions[ticket.id] && (
+                                        <div className="flex justify-between bg-yellow-50 p-1 rounded px-2">
+                                            <span className="text-yellow-700 text-sm">Waitlist Position:</span>
+                                            <span className="font-bold text-yellow-700">#{waitlistPositions[ticket.id]}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Email:</span>
                                         <span className="font-medium">{ticket.email}</span>
