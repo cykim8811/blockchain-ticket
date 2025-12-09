@@ -4,7 +4,7 @@ export const events = [
     title: "Tech Summit 2025",
     date: "2025-12-15",
     location: "Seoul, Korea",
-    price: "$150",
+    price: "$350",
     image:
       "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80",
     totalSeats: 10,
@@ -17,7 +17,7 @@ export const events = [
     price: "$200",
     image:
       "https://images.unsplash.com/photo-1591115765373-5207764f72e7?auto=format&fit=crop&w=800&q=80",
-    totalSeats: 40,
+    totalSeats: 20,
   },
   {
     id: 3,
@@ -27,6 +27,6 @@ export const events = [
     price: "$50",
     image:
       "https://images.unsplash.com/photo-1561214115-f2f134cc4912?auto=format&fit=crop&w=800&q=80",
-    totalSeats: 40,
+    totalSeats: 30,
   },
 ];
