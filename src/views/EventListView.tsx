@@ -18,10 +18,24 @@ import {
   LogOut,
   LayoutDashboard,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function EventListView() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+
+  // get all document from 'timed' collection
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "timed"), (snapshot) => {
+      if (snapshot.docs.length > 0) {
+        setIsOpen(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -94,7 +108,10 @@ export default function EventListView() {
                 <span className="text-lg font-bold text-primary">
                   {event.price}
                 </span>
-                <Button onClick={() => navigate(`/ticketing/${event.id}`)}>
+                <Button
+                  onClick={() => navigate(`/ticketing/${event.id}`)}
+                  disabled={isOpen === 0}
+                >
                   Book Ticket
                 </Button>
               </CardFooter>
