@@ -110,7 +110,7 @@ export default function EventListView() {
                 </span>
                 <Button
                   onClick={() => navigate(`/ticketing/${event.id}`)}
-                  disabled={isOpen === 0}
+                  disabled={!isOpen}
                 >
                   Book Ticket
                 </Button>
