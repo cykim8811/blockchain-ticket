@@ -228,12 +228,6 @@ export default function TicketingView() {
     try {
       // Simulate Blockchain Transaction
       setProcessingStatus("sending");
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // 2s delay
-
-      setProcessingStatus("confirming");
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // 2s delay
-
-      setProcessingStatus("booking");
 
       // Actual Database Write
       await addDoc(collection(db, "tickets"), {
@@ -251,6 +245,13 @@ export default function TicketingView() {
             .map(() => Math.floor(Math.random() * 16).toString(16))
             .join(""), // Fake TX Hash
       });
+
+      await new Promise((resolve) => setTimeout(resolve, 15000)); // 15s delay
+
+      setProcessingStatus("confirming");
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // 2s delay
+
+      setProcessingStatus("booking");
 
       alert(
         isFull
